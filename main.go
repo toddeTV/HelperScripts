@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"helper-scripts/src/greet"
+	"helper-scripts/src/mobilePhoneImageRename"
 )
 
 type Runner interface {
@@ -21,6 +22,7 @@ func root(args []string) error {
 
 	cmds := []Runner{
 		greet.Cmd(),
+		mobilePhoneImageRename.Cmd(),
 	}
 
 	subcommand := os.Args[1]
