@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"errors"
@@ -106,94 +107,104 @@ func processCSVFile(filePath string) error {
 	// Open the CSV file
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("error opening file: %w", err) //TODO use this also in other places instead of `return nil`?
+		return fmt.Errorf("error opening input CSV file: %w", err) //TODO use this also in other places instead of `return nil`?
 	}
 	defer file.Close()
 
-	// Read the CSV data
+	// Create the output CSV file
+	newFilePath := strings.TrimSuffix(filePath, ".csv") + "_modified.csv"
+	newFile, err := os.Create(newFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating output CSV file: %w", err)
+	}
+	defer newFile.Close()
+
+	// Read the input CSV file
 	reader := csv.NewReader(file)
 	rows, err := reader.ReadAll()
 	if err != nil {
-		return fmt.Errorf("error reading CSV: %w", err)
+		return fmt.Errorf("error reading input CSV file: %w", err)
 	}
 
-	// Identify the columns to be dropped
-	columnsToDrop := []string{
-		"Client",
-		"Task",
-		"User",
-		"Group",
-		"Email",
-		"Tags",
-		"Start Time",
-		"End Date",
-		"End Time",
-		"Duration (h)",
-		"Billable Rate (EUR)",
-		"Billable Amount (EUR)",
+	// Find the indices of the columns to drop
+	columnIndices := []int{
+		findColumnIndex(rows[0], "Client"),
+		findColumnIndex(rows[0], "Task"),
+		findColumnIndex(rows[0], "User"),
+		findColumnIndex(rows[0], "Group"),
+		findColumnIndex(rows[0], "Email"),
+		findColumnIndex(rows[0], "Tags"),
+		findColumnIndex(rows[0], "Start Time"),
+		findColumnIndex(rows[0], "End Date"),
+		findColumnIndex(rows[0], "End Time"),
+		findColumnIndex(rows[0], "Duration (h)"),
+		findColumnIndex(rows[0], "Billable Rate (EUR)"),
+		findColumnIndex(rows[0], "Billable Amount (EUR)"),
 	}
 
-	// Determine the column indices to drop
-	columnIndices := make([]int, 0, len(columnsToDrop))
-	headerRow := rows[0]
-	for i, columnName := range headerRow {
-		for _, columnToDrop := range columnsToDrop {
-			if columnName == columnToDrop {
-				columnIndices = append(columnIndices, i)
-				break
+	// Drop the columns from each row
+	for i := range rows {
+		row := rows[i]
+		for j := len(columnIndices) - 1; j >= 0; j-- {
+			columnIndex := columnIndices[j]
+			if columnIndex >= 0 && columnIndex < len(row) {
+				row = append(row[:columnIndex], row[columnIndex+1:]...)
+			}
+		}
+		rows[i] = row
+	}
+
+	// Combine rows with the same key and sum up the durations
+	combinedRows := make(map[string]CombinedRow)
+	for _, row := range rows[1:] {
+		project := row[0]
+		description := row[1]
+		startDate, _ := time.Parse("02/01/2006", row[3])     // Adjusted column index
+		durationDecimal, _ := strconv.ParseFloat(row[4], 64) // Adjusted column index
+		billable := row[2]                                   // Adjusted column index
+
+		key := strings.Join([]string{project, description, startDate.Format("02/01/2006"), billable}, "|")
+
+		if existingRow, ok := combinedRows[key]; ok {
+			existingRow.DurationDecimal += durationDecimal
+			combinedRows[key] = existingRow
+		} else {
+			combinedRows[key] = CombinedRow{
+				Project:         project,
+				Description:     description,
+				StartDate:       startDate,
+				DurationDecimal: durationDecimal,
+				Billable:        billable,
 			}
 		}
 	}
 
-	// Create a map to store the combined rows
-	combinedRows := make(map[string]float64)
-
-	// Process the rows and combine rows with the same Project, Description, Start Date, and Billable
-	for _, row := range rows[1:] {
-		// save some columns without modifications
-		project := row[0]
-		description := row[2]
-		billable := row[8]
-
-		// parse duration as decimal
-		durationDecimal, err := strconv.ParseFloat(row[14], 64)
-		if err != nil {
-			return fmt.Errorf("error parsing duration decimal: %w", err)
-		}
-
-		// parse start date as date in format `yyyy-mm-dd`
-		startDateParsed, err := time.Parse("02/01/2006", row[9])
-		if err != nil {
-			return fmt.Errorf("error parsing date: %w", err)
-		}
-		startDate := startDateParsed.Format("2006-01-02")
-
-		// save
-		key := fmt.Sprintf("%s|%s|%s|%s", project, description, billable, startDate)
-		combinedRows[key] += durationDecimal
+	// Sort the combined rows by Start Date
+	sortedKeys := make([]string, 0, len(combinedRows))
+	for key := range combinedRows {
+		sortedKeys = append(sortedKeys, key)
 	}
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		startDateI := combinedRows[sortedKeys[i]].StartDate
+		startDateJ := combinedRows[sortedKeys[j]].StartDate
+		return startDateI.Before(startDateJ)
+	})
 
-	// Generate the output file path
-	outputFilePath := generateOutputFilePath(filePath)
-
-	// Open the output CSV file
-	newFile, err := os.Create(outputFilePath)
-	if err != nil {
-		return fmt.Errorf("error creating output file: %w", err)
-	}
-	defer newFile.Close()
+	// Create the CSV writer for the output file
+	writer := csv.NewWriter(newFile)
+	defer writer.Flush()
 
 	// Write the header row to the output CSV file
-	err = writeHeader(newFile, headerRow, columnIndices)
+	headerRow := []string{"Project", "Description", "Start Date", "Duration (decimal)", "Billable", "Duration (h short)"}
+	err = writer.Write(headerRow)
 	if err != nil {
-		return fmt.Errorf("error writing output CSV header: %w", err)
+		return fmt.Errorf("error writing header row to output CSV: %w", err)
 	}
 
 	// Write the combined rows to the output CSV file
-	writer := csv.NewWriter(newFile)
-	for key, durationDecimal := range combinedRows {
-		combinedRow := strings.Split(key, "|")
-		combinedRow = append(combinedRow, strconv.FormatFloat(durationDecimal, 'f', 2, 64))
+	for _, key := range sortedKeys {
+		combinedRow := combinedRows[key]
+		durationDecimal := combinedRow.DurationDecimal
 
 		// Calculate the time string representation from the Duration (decimal)
 		durationHour := int(durationDecimal)
@@ -203,15 +214,20 @@ func processCSVFile(filePath string) error {
 		}
 		durationTimeString := fmt.Sprintf("%02d:%02d", durationHour, durationMinute)
 
-		combinedRow = append(combinedRow, durationTimeString)
+		row := []string{
+			combinedRow.Project,
+			combinedRow.Description,
+			combinedRow.StartDate.Format("02/01/2006"),
+			strconv.FormatFloat(durationDecimal, 'f', 2, 64),
+			combinedRow.Billable,
+			durationTimeString,
+		}
 
-		err = writer.Write(combinedRow)
+		err = writer.Write(row)
 		if err != nil {
 			return fmt.Errorf("error writing combined row to output CSV: %w", err)
 		}
 	}
-
-	writer.Flush()
 
 	return nil
 }
@@ -250,4 +266,23 @@ func contains(slice []int, value int) bool {
 		}
 	}
 	return false
+}
+
+// Helper function to find the index of a column in a row
+func findColumnIndex(row []string, columnName string) int {
+	for i, col := range row {
+		if col == columnName {
+			return i
+		}
+	}
+	return -1
+}
+
+// Struct to store combined rows
+type CombinedRow struct {
+	Project         string
+	Description     string
+	StartDate       time.Time
+	DurationDecimal float64
+	Billable        string
 }
