@@ -232,42 +232,6 @@ func processCSVFile(filePath string) error {
 	return nil
 }
 
-func generateOutputFilePath(inputFilePath string) string {
-	fileName := strings.TrimSuffix(filepath.Base(inputFilePath), filepath.Ext(inputFilePath))
-	outputFilePath := fileName + "_modified.csv"
-	return filepath.Join(filepath.Dir(inputFilePath), outputFilePath)
-}
-
-func writeHeader(file *os.File, headerRow []string, columnIndices []int) error {
-	headerRow = append(headerRow, "Duration (h short)")
-	writer := csv.NewWriter(file)
-
-	modifiedHeaderRow := make([]string, 0, len(headerRow)-len(columnIndices))
-	for i, columnName := range headerRow {
-		if !contains(columnIndices, i) {
-			modifiedHeaderRow = append(modifiedHeaderRow, columnName)
-		}
-	}
-
-	err := writer.Write(modifiedHeaderRow)
-	if err != nil {
-		return fmt.Errorf("error writing output CSV header: %w", err)
-	}
-
-	writer.Flush()
-
-	return nil
-}
-
-func contains(slice []int, value int) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
-
 // Helper function to find the index of a column in a row
 func findColumnIndex(row []string, columnName string) int {
 	for i, col := range row {
