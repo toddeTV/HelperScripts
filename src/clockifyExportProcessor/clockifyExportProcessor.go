@@ -163,7 +163,7 @@ func processCSVFile(filePath string) error {
 		durationDecimal, _ := strconv.ParseFloat(row[4], 64) // Adjusted column index
 		billable := row[2]                                   // Adjusted column index
 
-		key := strings.Join([]string{project, description, startDate.Format("02/01/2006"), billable}, "|")
+		key := strings.Join([]string{project, description, startDate.Format("2006-01-02"), billable}, "|")
 
 		if existingRow, ok := combinedRows[key]; ok {
 			existingRow.DurationDecimal += durationDecimal
@@ -217,7 +217,7 @@ func processCSVFile(filePath string) error {
 		row := []string{
 			combinedRow.Project,
 			combinedRow.Description,
-			combinedRow.StartDate.Format("02/01/2006"),
+			combinedRow.StartDate.Format("2006-01-02"),
 			strconv.FormatFloat(durationDecimal, 'f', 2, 64),
 			combinedRow.Billable,
 			durationTimeString,
