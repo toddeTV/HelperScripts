@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"helper-scripts/src/clockifyExportProcessor"
 	"helper-scripts/src/greet"
 )
 
@@ -21,6 +22,7 @@ func root(args []string) error {
 
 	cmds := []Runner{
 		greet.Cmd(),
+		clockifyExportProcessor.Cmd(),
 	}
 
 	subcommand := os.Args[1]
