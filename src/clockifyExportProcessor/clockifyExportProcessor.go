@@ -117,20 +117,6 @@ func processCSVFile(filePath string) error {
 		return fmt.Errorf("error reading CSV: %w", err)
 	}
 
-	// // Modify the data using loops
-	// for i, row := range rows {
-	// 	for j, value := range row {
-	// 		// Modify the value (e.g., append a prefix)
-	// 		row[j] = "Modified: " + value
-	// 	}
-	// 	rows[i] = row
-	// }
-
-	// // Print the modified data
-	// for _, row := range rows {
-	// 	fmt.Println(row)
-	// }
-
 	// Identify the columns to be dropped
 	columnsToDrop := []string{
 		"Client",
@@ -147,8 +133,6 @@ func processCSVFile(filePath string) error {
 		"Billable Amount (EUR)",
 	}
 
-	fmt.Println("1")
-
 	// Determine the column indices to drop
 	columnIndices := make([]int, 0, len(columnsToDrop))
 	headerRow := rows[0]
@@ -160,8 +144,6 @@ func processCSVFile(filePath string) error {
 			}
 		}
 	}
-
-	fmt.Println("2")
 
 	// Create a map to store the combined rows
 	combinedRows := make(map[string]float64)
@@ -190,8 +172,6 @@ func processCSVFile(filePath string) error {
 		key := fmt.Sprintf("%s|%s|%s|%s", project, description, billable, startDate)
 		combinedRows[key] += durationDecimal
 	}
-
-	fmt.Println("3")
 
 	// Generate the output file path
 	outputFilePath := generateOutputFilePath(filePath)
