@@ -159,11 +159,11 @@ func processCSVFile(filePath string) error {
 	for _, row := range rows[1:] {
 		project := row[0]
 		description := row[1]
+		billable := row[2]                                   // Adjusted column index
 		startDate, _ := time.Parse("02/01/2006", row[3])     // Adjusted column index
 		durationDecimal, _ := strconv.ParseFloat(row[4], 64) // Adjusted column index
-		billable := row[2]                                   // Adjusted column index
 
-		key := strings.Join([]string{project, description, startDate.Format("2006-01-02"), billable}, "|")
+		key := strings.Join([]string{project, description, billable, startDate.Format("2006-01-02")}, "|")
 
 		if existingRow, ok := combinedRows[key]; ok {
 			existingRow.DurationDecimal += durationDecimal
@@ -172,9 +172,9 @@ func processCSVFile(filePath string) error {
 			combinedRows[key] = CombinedRow{
 				Project:         project,
 				Description:     description,
+				Billable:        billable,
 				StartDate:       startDate,
 				DurationDecimal: durationDecimal,
-				Billable:        billable,
 			}
 		}
 	}
@@ -195,7 +195,7 @@ func processCSVFile(filePath string) error {
 	defer writer.Flush()
 
 	// Write the header row to the output CSV file
-	headerRow := []string{"Project", "Description", "Start Date", "Duration (decimal)", "Billable", "Duration (h short)"}
+	headerRow := []string{"Project", "Description", "Billable", "Start Date", "Duration (decimal)", "Duration (h short)"}
 	err = writer.Write(headerRow)
 	if err != nil {
 		return fmt.Errorf("error writing header row to output CSV: %w", err)
@@ -217,9 +217,9 @@ func processCSVFile(filePath string) error {
 		row := []string{
 			combinedRow.Project,
 			combinedRow.Description,
+			combinedRow.Billable,
 			combinedRow.StartDate.Format("2006-01-02"),
 			strconv.FormatFloat(durationDecimal, 'f', 2, 64),
-			combinedRow.Billable,
 			durationTimeString,
 		}
 
@@ -282,7 +282,7 @@ func findColumnIndex(row []string, columnName string) int {
 type CombinedRow struct {
 	Project         string
 	Description     string
+	Billable        string
 	StartDate       time.Time
 	DurationDecimal float64
-	Billable        string
 }
