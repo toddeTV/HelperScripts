@@ -1,7 +1,11 @@
 #!/bin/sh
 
+# empty `/dist` folder by deleting and re-creating it
 rm -rf ./dist
 mkdir -p ./dist
+
+# create empty `.gitkeep`
+touch ./dist/.gitkeep
 
 # Windows 64-bit
 GOOS=windows GOARCH=amd64 go build -o ./dist/HelperScripts_win-amd64.exe ./main.go
