@@ -10,6 +10,7 @@ import (
 
 	"errors"
 
+	"strconv"
 	"time"
 
 	"github.com/atotto/clipboard"
@@ -162,28 +163,32 @@ func processCSVFile(filePath string) error {
 
 	fmt.Println("2")
 
-	// Create a new slice to store modified rows, excluding the header row
-	modifiedRows := make([][]string, len(rows)-1)
+	// Create a map to store the combined rows
+	combinedRows := make(map[string]float64)
 
-	// Drop the columns from each row
-	for i, row := range rows[1:] {
-		modifiedRow := make([]string, 0, len(row)-len(columnIndices))
-		for j, cell := range row {
-			// Only keep cells that are not in columnIndices
-			if !contains(columnIndices, j) {
-				// Modify the date format for the Start Date column
-				if headerRow[j] == "Start Date" {
-					parsedDate, err := time.Parse("02/01/2006", cell)
-					if err != nil {
-						return fmt.Errorf("error parsing date: %w", err)
-					}
-					modifiedRow = append(modifiedRow, parsedDate.Format("2006-01-02"))
-				} else {
-					modifiedRow = append(modifiedRow, cell)
-				}
-			}
+	// Process the rows and combine rows with the same Project, Description, Start Date, and Billable
+	for _, row := range rows[1:] {
+		// save some columns without modifications
+		project := row[0]
+		description := row[2]
+		billable := row[8]
+
+		// parse duration as decimal
+		durationDecimal, err := strconv.ParseFloat(row[14], 64)
+		if err != nil {
+			return fmt.Errorf("error parsing duration decimal: %w", err)
 		}
-		modifiedRows[i] = modifiedRow
+
+		// parse start date as date in format `yyyy-mm-dd`
+		startDateParsed, err := time.Parse("02/01/2006", row[9])
+		if err != nil {
+			return fmt.Errorf("error parsing date: %w", err)
+		}
+		startDate := startDateParsed.Format("2006-01-02")
+
+		// save
+		key := fmt.Sprintf("%s|%s|%s|%s", project, description, billable, startDate)
+		combinedRows[key] += durationDecimal
 	}
 
 	fmt.Println("3")
@@ -204,11 +209,15 @@ func processCSVFile(filePath string) error {
 		return fmt.Errorf("error writing output CSV header: %w", err)
 	}
 
-	// Write the modified data to the output CSV file
+	// Write the combined rows to the output CSV file
 	writer := csv.NewWriter(newFile)
-	err = writer.WriteAll(modifiedRows)
-	if err != nil {
-		return fmt.Errorf("error writing output CSV: %w", err)
+	for key, durationDecimal := range combinedRows {
+		combinedRow := strings.Split(key, "|")
+		combinedRow = append(combinedRow, strconv.FormatFloat(durationDecimal, 'f', 2, 64))
+		err = writer.Write(combinedRow)
+		if err != nil {
+			return fmt.Errorf("error writing combined row to output CSV: %w", err)
+		}
 	}
 
 	writer.Flush()
