@@ -214,6 +214,17 @@ func processCSVFile(filePath string) error {
 	for key, durationDecimal := range combinedRows {
 		combinedRow := strings.Split(key, "|")
 		combinedRow = append(combinedRow, strconv.FormatFloat(durationDecimal, 'f', 2, 64))
+
+		// Calculate the time string representation from the Duration (decimal)
+		durationHour := int(durationDecimal)
+		durationMinute := int((durationDecimal - float64(durationHour)) * 60)
+		if durationMinute >= 30 {
+			durationHour++ // Round up to the nearest hour if more than or equal to 30 minutes
+		}
+		durationTimeString := fmt.Sprintf("%02d:%02d", durationHour, durationMinute)
+
+		combinedRow = append(combinedRow, durationTimeString)
+
 		err = writer.Write(combinedRow)
 		if err != nil {
 			return fmt.Errorf("error writing combined row to output CSV: %w", err)
@@ -232,6 +243,7 @@ func generateOutputFilePath(inputFilePath string) string {
 }
 
 func writeHeader(file *os.File, headerRow []string, columnIndices []int) error {
+	headerRow = append(headerRow, "Duration (h short)")
 	writer := csv.NewWriter(file)
 
 	modifiedHeaderRow := make([]string, 0, len(headerRow)-len(columnIndices))
