@@ -11,6 +11,7 @@ import (
 
 	"errors"
 
+	"math"
 	"strconv"
 	"time"
 
@@ -207,11 +208,8 @@ func processCSVFile(filePath string) error {
 		durationDecimal := combinedRow.DurationDecimal
 
 		// Calculate the time string representation from the Duration (decimal)
-		durationHour := int(durationDecimal)
-		durationMinute := int((durationDecimal - float64(durationHour)) * 60)
-		if durationMinute >= 30 {
-			durationHour++ // Round up to the nearest hour if more than or equal to 30 minutes
-		}
+		durationHour := int(math.Floor(durationDecimal))
+		durationMinute := int(math.Floor((durationDecimal - float64(durationHour)) * 60))
 		durationTimeString := fmt.Sprintf("%02d:%02d", durationHour, durationMinute)
 
 		row := []string{
