@@ -10,6 +10,8 @@ import (
 
 	"errors"
 
+	"time"
+
 	"github.com/atotto/clipboard"
 )
 
@@ -169,7 +171,16 @@ func processCSVFile(filePath string) error {
 		for j, cell := range row {
 			// Only keep cells that are not in columnIndices
 			if !contains(columnIndices, j) {
-				modifiedRow = append(modifiedRow, cell)
+				// Modify the date format for the Start Date column
+				if headerRow[j] == "Start Date" {
+					parsedDate, err := time.Parse("02/01/2006", cell)
+					if err != nil {
+						return fmt.Errorf("error parsing date: %w", err)
+					}
+					modifiedRow = append(modifiedRow, parsedDate.Format("2006-01-02"))
+				} else {
+					modifiedRow = append(modifiedRow, cell)
+				}
 			}
 		}
 		modifiedRows[i] = modifiedRow
