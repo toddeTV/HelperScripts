@@ -27,6 +27,8 @@ func Cmd() *Command {
 		fs: flag.NewFlagSet("clockifyExportProcessor", flag.ContinueOnError),
 	}
 
+	//TODO add help flag: seconds will always be cut off and will get lost (always round down on minute).
+
 	return gc
 }
 
@@ -196,7 +198,7 @@ func processCSVFile(filePath string) error {
 	defer writer.Flush()
 
 	// Write the header row to the output CSV file
-	headerRow := []string{"Project", "Description", "Billable", "Start Date", "Duration (decimal)", "Duration (h short)"}
+	headerRow := []string{"Project", "Description", "Billable", "Start Date", "Duration (decimal)", "Duration (h long)", "Duration (h short)"}
 	err = writer.Write(headerRow)
 	if err != nil {
 		return fmt.Errorf("error writing header row to output CSV: %w", err)
@@ -210,7 +212,8 @@ func processCSVFile(filePath string) error {
 		// Calculate the time string representation from the Duration (decimal)
 		durationHour := int(math.Floor(durationDecimal))
 		durationMinute := int(math.Floor((durationDecimal - float64(durationHour)) * 60))
-		durationTimeString := fmt.Sprintf("%02d:%02d", durationHour, durationMinute)
+		durationTimeStringLong := fmt.Sprintf("%02d:%02d:00", durationHour, durationMinute)
+		durationTimeStringShort := fmt.Sprintf("%02d:%02d", durationHour, durationMinute)
 
 		row := []string{
 			combinedRow.Project,
@@ -218,7 +221,8 @@ func processCSVFile(filePath string) error {
 			combinedRow.Billable,
 			combinedRow.StartDate.Format("2006-01-02"),
 			strconv.FormatFloat(durationDecimal, 'f', 2, 64),
-			durationTimeString,
+			durationTimeStringLong,
+			durationTimeStringShort,
 		}
 
 		err = writer.Write(row)
